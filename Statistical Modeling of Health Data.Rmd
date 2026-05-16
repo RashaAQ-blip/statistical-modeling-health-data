@@ -1,0 +1,291 @@
+---
+title: "Statistical Analysis of Body Composition & Health Indicators"
+author: "Rasha Quadri"
+date: "2026-03-22"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: readable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# **Introduction**
+
+Understanding how different aspects of body composition relate to one another is important in health and medical analysis.
+
+This project analyzes relationships between key body composition variables, including **body protein content**, **total body fat ratio**, and **total body water**. 
+
+The objectives of this analysis are to:
+
+- Identify relationships between variables
+- Build and evaluate regression models
+- Assess statistical assumptions
+- Interpret results in a meaningful real-world context
+
+Statistical techniques such as **linear regression**, **multiple regression**, and **ANOVA** are used to extract insights from the dataset.
+
+
+
+
+# **Data Preprocessing**
+
+
+```{r}
+
+medical <- read.csv("medicaldata2.csv", header = TRUE)
+
+head(medical)
+
+```
+
+## **Converting Variables to Factors**
+
+```{r}
+
+medical$Gallstone_Status <- factor(medical$Gallstone_Status)
+medical$CAD <- factor(medical$CAD)
+medical$Diabetes_Mellitus <- factor(medical$Diabetes_Mellitus)
+
+medical$Comorbidity <- factor(
+  medical$Comorbidity,
+  ordered = TRUE,
+  levels = c(0 , 1, 2, 3)
+)
+
+medical$Hepatic_Fat_Accumulation <- factor(
+  medical$Hepatic_Fat_Accumulation,
+  ordered = TRUE,
+  levels = c(0, 1, 2, 3)
+)
+
+medical$Age_Class <- factor(
+  medical$Age_Class,
+  ordered = TRUE,
+  levels = c("Younger", "Lower Middle", "Upper Middle", "Elder")
+)
+
+
+```
+
+Categorical variables were converted into factors to ensure proper handling in statistical models.
+
+
+
+# **Simple Linear Regression**
+
+## **Relationship: Body Protein vs Body Fat**
+
+```{r}
+
+plot(
+  medical$Body_Protein_Content,
+  medical$Total_Body_Fat_Ratio,
+  xlab = "Body Protein Content",
+  ylab = "Total Body Fat Ratio",
+  main = "Body Fat Ratio vs Body Protein Content"
+)
+
+```
+
+```{r}
+model1 <- lm(Total_Body_Fat_Ratio ~ Body_Protein_Content, data = medical)
+summary(model1)
+
+```
+
+
+## **Model Diagnostics**
+
+```{r}
+
+plot(model1$fitted.values, model1$residuals)
+abline(h=0,col="red")
+
+qqnorm(model1$residuals)
+qqline(model1$residuals, col="red")
+
+shapiro.test(model1$residuals)
+
+```
+
+```{r}
+
+cor(medical$Total_Body_Fat_Ratio, medical$Body_Protein_Content)
+
+```
+
+## **Interpretation**
+
+There is a clear **negative linear relationship** between body protein content and total body fat ratio.
+
+- The model explains about **49% of the variation** (R^2^ = 0.49)
+- The predictor is **statistically significant** (p < 0.05)
+- Correlation confirms a **strong negative association**
+
+Residual diagnostics show no major violations of assumptions.
+
+**Conclusion**: Higher body protein content is associated with lower body fat.
+
+
+
+# **Multiple Linear Regression**
+
+## **Predicting Total Body Water**
+
+```{r}
+
+model2 <- lm(Total_Body_Water ~ Height + Weight + Body_Protein_Content, data = medical)
+summary(model2)
+
+```
+
+
+## **Diagnostics**
+
+```{r}
+
+plot(model2$fitted.values, model2$residuals)
+abline(h=0, col="red")
+
+qqnorm(model2$residuals)
+qqline(model2$residuals)
+
+shapiro.test(model2$residuals)
+
+```
+
+```{r}
+
+library(lmtest)
+dwtest(model2)
+
+```
+
+## **Interpretation**
+
+The model explains approximately **78% of the variation** in total body water.
+
+- **Height and Weight** are statistically significant predictors
+- **Body Protein Content is not significant**
+- No evidence of autocorrelation
+
+**Conclusion**: Body water is primarily driven by physical characteristics (height and weight), not protein content.
+
+
+# **ANOVA: Age and Body Fat**
+
+## **Research Question**
+
+Does body fat differ across age groups?
+
+```{r}
+
+library(car)
+
+anova_model <- aov(Total_Body_Fat_Ratio ~ Age_Class, data = medical)
+summary(anova_model)
+
+```
+
+
+## **Assumption Checks**
+
+```{r}
+
+qqnorm(residuals(anova_model))
+qqline(residuals(anova_model))
+
+shapiro.test(residuals(anova_model))
+
+leveneTest(Total_Body_Fat_Ratio ~ Age_Class, data = medical)
+
+```
+
+## **Visualization**
+
+```{r}
+
+library(ggplot2)
+
+ggplot(medical, aes(x=Age_Class, y=Total_Body_Fat_Ratio))+
+  geom_boxplot(fill="lightblue")+
+  theme_minimal()
+
+```
+
+## **Interpretation**
+
+The ANOVA test is **statistically significant (p < 0.05)**, indicating that body fat differs across age groups.
+
+Post-hoc comparisons show that **middle age groups tend to have higher body fat levels** compared to younger individuals.
+
+**Conclusion**: Age plays a meaningful role in body fat distribution.
+
+
+# **Two-Way ANOVA: Triglyceride Levels**
+
+## **Research Question**
+
+Do diabetes and hepatic fat affect triglyceride levels?
+
+```{r}
+
+model3 <- aov(Triglyceride ~ Diabetes_Mellitus * Hepatic_Fat_Accumulation, data = medical)
+summary(model3)
+
+```
+## **Assumptions**
+
+```{r}
+
+shapiro.test(residuals(model3))
+
+qqnorm(residuals(model3))
+qqline(residuals(model3))
+
+leveneTest(Triglyceride ~ Diabetes_Mellitus * Hepatic_Fat_Accumulation, data = medical)
+
+```
+
+## **Visualization**
+
+```{r}
+
+ggplot(medical, aes(x=Diabetes_Mellitus, y=Triglyceride))+
+  stat_summary(fun=mean, geom="bar")
+
+ggplot(medical, aes(x=Hepatic_Fat_Accumulation, y=Triglyceride))+
+  stat_summary(fun=mean, geom="bar")
+
+```
+
+## **Interpretation**
+
+- The **interaction effect is not significant**, meaning the effect of diabetes does not depend on hepatic fat level
+
+- Both variables have **significant individual effects**
+
+**Conclusion:**
+
+- Diabetes is associated with higher triglyceride levels
+- Hepatic fat accumulation also increases triglycerides
+- These effects act independently
+
+# **Key Insights**
+
+- Body protein is strongly associated with **lower body fat**
+- Height and weight are the **main drivers of body water**
+- Age significantly affects **body fat distribution**
+- Diabetes and hepatic fat both impact **triglyceride levels**
+
+# **Conclusion**
+
+This project demonstrates how statistical modeling techniques can be used to analyze real-world health data.
+
+By applying regression and ANOVA methods, we identified key predictors, evaluated assumptions, and extracted meaningful insights from the dataset.
+
+These methods provide a strong foundation for data-driven decision making in health and medical contexts.
